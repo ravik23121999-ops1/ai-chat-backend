@@ -6,6 +6,7 @@ export class PaymentController {
   private router: Router;
   private razorpayService: RazorpayService;
   private socketService: SocketService;
+  // Demo-only store: premium status resets when the server restarts
   private premiumUsers: Set<string> = new Set();
 
   constructor(razorpayService: RazorpayService, socketService: SocketService) {
@@ -27,7 +28,7 @@ export class PaymentController {
       const { amount, currency } = req.body;
 
       if (!amount) {
-        res.status(400).json({ error: 'Amount is required' });
+        res.status(400).json({ success: false, error: 'A payment amount is required.' });
         return;
       }
 
@@ -38,7 +39,8 @@ export class PaymentController {
         order
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to create payment order' });
+      console.error('Create payment order failed:', error);
+      res.status(500).json({ success: false, error: 'Could not start the payment. Please try again.' });
     }
   }
 
@@ -47,8 +49,9 @@ export class PaymentController {
       const { orderId, paymentId, signature, userId } = req.body;
 
       if (!orderId || !paymentId || !signature || !userId) {
-        res.status(400).json({ 
-          error: 'Order ID, payment ID, signature, and user ID are required' 
+        res.status(400).json({
+          success: false,
+          error: 'Payment details are incomplete. Please try again.'
         });
         return;
       }
@@ -61,21 +64,22 @@ export class PaymentController {
 
         res.json({
           success: true,
-          message: 'Payment verified successfully',
+          message: 'Payment successful. Premium is now unlocked.',
           isPremium: true
         });
       } else {
         res.status(400).json({
           success: false,
-          error: 'Invalid payment signature'
+          error: 'We could not confirm this payment. Please try again or contact support.'
         });
       }
     } catch (error) {
-      res.status(500).json({ error: 'Failed to verify payment' });
+      console.error('Verify payment failed:', error);
+      res.status(500).json({ success: false, error: 'Could not verify your payment. Please try again.' });
     }
   }
 
-  private async getKeyId(req: Request, res: Response): Promise<void> {
+  private async getKeyId(_req: Request, res: Response): Promise<void> {
     try {
       const keyId = this.razorpayService.getKeyId();
       res.json({
@@ -83,22 +87,23 @@ export class PaymentController {
         keyId
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get Razorpay key ID' });
+      console.error('Get payment key failed:', error);
+      res.status(500).json({ success: false, error: 'Could not load payment settings.' });
     }
   }
 
   private async getPremiumStatus(req: Request, res: Response): Promise<void> {
     try {
-      const { userId } = req.params;
-      const userIdStr = Array.isArray(userId) ? userId[0] : userId;
-      const isPremium = this.premiumUsers.has(userIdStr);
+      const userId = String(req.params.userId);
+      const isPremium = this.premiumUsers.has(userId);
 
       res.json({
         success: true,
         isPremium
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get premium status' });
+      console.error('Get premium status failed:', error);
+      res.status(500).json({ success: false, error: 'Could not check your premium status.' });
     }
   }
 

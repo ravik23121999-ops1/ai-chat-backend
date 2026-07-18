@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
+import { createServer, Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { AuthController } from './controllers/AuthController';
 import { ChatController } from './controllers/ChatController';
@@ -28,7 +28,7 @@ function getAllowedOrigins(): string[] {
 
 class App {
   private app: express.Application;
-  private httpServer: any;
+  private httpServer: HttpServer;
   private io: SocketIOServer;
   private port: number;
   private allowedOrigins: string[];
@@ -43,9 +43,9 @@ class App {
 
   constructor() {
     this.app = express();
-    this.port = parseInt(process.env.PORT || '5000');
+    this.port = parseInt(process.env.PORT || '5000', 10);
     this.allowedOrigins = getAllowedOrigins();
-    
+
     this.httpServer = createServer(this.app);
     this.io = new SocketIOServer(this.httpServer, {
       cors: {
@@ -92,8 +92,8 @@ class App {
     this.app.use('/api/auth', this.authController.getRouter());
     this.app.use('/api/chat', this.chatController.getRouter());
     this.app.use('/api/payment', this.paymentController.getRouter());
-    
-    this.app.get('/health', (req, res) => {
+
+    this.app.get('/health', (_req, res) => {
       res.json({ status: 'ok', message: 'Server is running' });
     });
   }
@@ -103,7 +103,10 @@ class App {
   }
 
   public start(): void {
-    this.httpServer.listen(this.port, '0.0.0.0', () => {});
+    this.httpServer.listen(this.port, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${this.port}`);
+      console.log(`Allowed frontend origins: ${this.allowedOrigins.join(', ')}`);
+    });
   }
 }
 

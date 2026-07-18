@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 
 export class SocketService {
@@ -11,6 +12,8 @@ export class SocketService {
   public initialize(): void {
     this.io.on('connection', (socket: Socket) => {
       socket.on('join-room', (userId: string) => {
+        if (!userId) return;
+
         this.users.set(socket.id, userId);
         socket.join('chat-room');
 
@@ -21,9 +24,13 @@ export class SocketService {
       });
 
       socket.on('send-message', (data: { message: string; userId: string; username: string }) => {
+        if (!data?.message?.trim() || !data.userId || !data.username) {
+          return;
+        }
+
         const messageData = {
-          id: Date.now().toString(),
-          message: data.message,
+          id: randomUUID(),
+          message: data.message.trim(),
           userId: data.userId,
           username: data.username,
           timestamp: new Date().toISOString()
@@ -50,6 +57,6 @@ export class SocketService {
   }
 
   public getConnectedUsers(): string[] {
-    return Array.from(this.users.values());
+    return [...new Set(this.users.values())];
   }
 }

@@ -14,7 +14,7 @@ export class GeminiService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set in environment variables');
+      throw new Error('Gemini API key is missing. Set GEMINI_API_KEY in your environment.');
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
@@ -44,17 +44,14 @@ export class GeminiService {
   }
 
   private extractText(result: Awaited<ReturnType<GenerativeModel['generateContent']>>): string {
-    try {
-      const text = result.response.text();
-      if (!text?.trim()) {
-        throw new Error('Gemini returned an empty response');
-      }
-      return text.trim();
-    } catch (error: any) {
-      throw new Error(error?.message || 'Failed to read Gemini response text');
+    const text = result.response.text();
+    if (!text?.trim()) {
+      throw new Error('AI returned an empty response');
     }
+    return text.trim();
   }
 
+  // Try preferred model first, then fall back to other known models
   private async generateWithFallback(prompt: string): Promise<string> {
     let lastError: unknown;
 
@@ -65,14 +62,13 @@ export class GeminiService {
           timeout: MODEL_TIMEOUT_MS
         });
         return this.extractText(result);
-      } catch (error: any) {
+      } catch (error) {
         lastError = error;
       }
     }
 
-    throw new Error(
-      (lastError as any)?.message || 'All Gemini model attempts failed'
-    );
+    const message = lastError instanceof Error ? lastError.message : 'AI is unavailable right now';
+    throw new Error(message);
   }
 
   public async suggestReply(message: string, chatHistory: unknown[] = []): Promise<string> {
@@ -80,26 +76,18 @@ export class GeminiService {
     const context = history.join('\n');
     const prompt = `Given this chat history:\n${context}\n\nLast message: "${message}"\n\nSuggest a brief, natural reply (maximum 20 words):`;
 
-    try {
-      return await this.generateWithFallback(prompt);
-    } catch (error: any) {
-      throw new Error(error?.message || 'Failed to generate reply suggestion');
-    }
+    return this.generateWithFallback(prompt);
   }
 
   public async summarizeChat(messages: unknown[]): Promise<string> {
     const normalized = this.normalizeMessages(messages);
     if (normalized.length === 0) {
-      throw new Error('No valid messages provided to summarize');
+      throw new Error('No messages to summarize');
     }
 
     const clipped = normalized.slice(-40).map((line) => line.slice(0, 500));
     const prompt = `Summarize the following chat conversation in 2-3 sentences:\n${clipped.join('\n')}`;
 
-    try {
-      return await this.generateWithFallback(prompt);
-    } catch (error: any) {
-      throw new Error(error?.message || 'Failed to generate chat summary');
-    }
+    return this.generateWithFallback(prompt);
   }
 }

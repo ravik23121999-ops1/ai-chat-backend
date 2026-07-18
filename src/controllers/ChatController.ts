@@ -25,7 +25,7 @@ export class ChatController {
       const { message, chatHistory } = req.body;
 
       if (!message) {
-        res.status(400).json({ error: 'Message is required' });
+        res.status(400).json({ success: false, error: 'Please send a message first.' });
         return;
       }
 
@@ -36,10 +36,11 @@ export class ChatController {
         success: true,
         suggestion
       });
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Suggest reply failed:', error);
       res.status(500).json({
-        error: 'Failed to generate reply suggestion',
-        details: error?.message
+        success: false,
+        error: 'Could not suggest a reply right now. Please try again.'
       });
     }
   }
@@ -49,7 +50,7 @@ export class ChatController {
       const { messages } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
-        res.status(400).json({ error: 'Messages array is required' });
+        res.status(400).json({ success: false, error: 'There are no messages to summarize yet.' });
         return;
       }
 
@@ -59,15 +60,16 @@ export class ChatController {
         success: true,
         summary
       });
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Summarize chat failed:', error);
       res.status(500).json({
-        error: 'Failed to generate chat summary',
-        details: error?.message
+        success: false,
+        error: 'Could not summarize the chat right now. Please try again.'
       });
     }
   }
 
-  private async getConnectedUsers(req: Request, res: Response): Promise<void> {
+  private async getConnectedUsers(_req: Request, res: Response): Promise<void> {
     try {
       const users = this.socketService.getConnectedUsers();
       res.json({
@@ -75,7 +77,8 @@ export class ChatController {
         users
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get connected users' });
+      console.error('Get connected users failed:', error);
+      res.status(500).json({ success: false, error: 'Could not load online users.' });
     }
   }
 

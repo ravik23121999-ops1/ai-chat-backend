@@ -7,9 +7,9 @@ export class AuthController {
 
   constructor() {
     this.router = express.Router();
-    
+
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in environment variables');
+      throw new Error('Google sign-in is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
     }
 
     this.oauth2Client = new OAuth2Client(
@@ -17,7 +17,7 @@ export class AuthController {
       process.env.GOOGLE_CLIENT_SECRET,
       'postmessage'
     );
-    
+
     this.setupRoutes();
   }
 
@@ -31,20 +31,19 @@ export class AuthController {
       const { idToken } = req.body;
 
       if (!idToken) {
-        res.status(400).json({ error: 'ID token is required' });
+        res.status(400).json({ success: false, error: 'Please sign in with Google again.' });
         return;
       }
 
-      // Verify the ID token with Google
       const ticket = await this.oauth2Client.verifyIdToken({
         idToken,
         audience: process.env.GOOGLE_CLIENT_ID
       });
 
       const payload = ticket.getPayload();
-      
+
       if (!payload) {
-        res.status(400).json({ error: 'Invalid token payload' });
+        res.status(400).json({ success: false, error: 'Could not verify your Google account. Please try again.' });
         return;
       }
 
@@ -57,35 +56,37 @@ export class AuthController {
           picture: payload.picture
         }
       });
-    } catch (error: any) {
-      res.status(401).json({ error: 'Authentication failed' });
+    } catch (error) {
+      console.error('Google login failed:', error);
+      res.status(401).json({ success: false, error: 'Could not sign you in. Please try again.' });
     }
   }
 
   private async getCurrentUser(req: Request, res: Response): Promise<void> {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader) {
-        res.status(401).json({ error: 'No authorization header' });
+        res.status(401).json({ success: false, error: 'Please sign in again.' });
         return;
       }
 
       const token = authHeader.replace('Bearer ', '');
-      
+
       const ticket = await this.oauth2Client.verifyIdToken({
         idToken: token,
         audience: process.env.GOOGLE_CLIENT_ID
       });
 
       const payload = ticket.getPayload();
-      
+
       if (!payload) {
-        res.status(400).json({ error: 'Invalid token payload' });
+        res.status(400).json({ success: false, error: 'Please sign in again.' });
         return;
       }
 
       res.json({
+        success: true,
         user: {
           id: payload.sub,
           email: payload.email,
@@ -93,8 +94,9 @@ export class AuthController {
           picture: payload.picture
         }
       });
-    } catch (error: any) {
-      res.status(401).json({ error: 'Invalid token' });
+    } catch (error) {
+      console.error('Get current user failed:', error);
+      res.status(401).json({ success: false, error: 'Your session expired. Please sign in again.' });
     }
   }
 
